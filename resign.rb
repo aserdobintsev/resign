@@ -1,11 +1,32 @@
-#!/usr/bin/env ruby
+#--###########################################################
+# Copyright 2012, Timothy Perfitt <tperfitt@twocanoes.com>
+#
+# Distributed under the MIT license (MIT). 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-require 'base64'
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+#
+##############################################################
+require "base64"
 require 'openssl'
 require 'base64'
 require 'cgi'
 require 'stringio'
-require 'ftools'
+require 'fileutils'
 require 'getoptlong'
 require 'pathname'
 require File.dirname(__FILE__)+"/generator.rb"
@@ -78,29 +99,23 @@ prov_profile_path=nil
 #app_path is the posix path to the application bundle to sign
 app_path=nil
 
-app_name = nil
-
 #setup the options
 opts = GetoptLong.new(
     [ '--prov_profile_path', '-p', GetoptLong::REQUIRED_ARGUMENT ],
     [ '--app_path', '-a', GetoptLong::REQUIRED_ARGUMENT ],
     [ '--developerid', '-d', GetoptLong::REQUIRED_ARGUMENT ],
-    [ '--app_name', '-n', GetoptLong::REQUIRED_ARGUMENT ]
   )
   
 opts.each do |opt, arg|
   case opt
     when '--prov_profile_path'
       prov_profile_path=arg
-     when '--app_path'
+    when '--app_path'
       app_path = arg
     when '--developerid'
       dev_id = arg
-    when '--app_name'
-      app_name = arg
   end
 end
-
 
 
 throw "file #{prov_profile_path} does not exist" if !File.exists?(prov_profile_path)
@@ -165,9 +180,15 @@ system("plutil -convert xml1 \"#{info_plist_path}\"")
 file_data=File.read(info_plist_path)
 info_plist=Plist::parse_xml(file_data)
 
-#update version number
-info_plist['CFBundleVersion'] += '.1'
-$stderr.puts "   Updating Info.plist with new bundle version of #{info_plist['CFBundleVersion']}..."
+#Update version number.
+#Uncomment next 2 lines if needed.
+# info_plist['CFBundleVersion'] += '.1'
+# $stderr.puts "   Updating Info.plist with new bundle version of #{info_plist['CFBundleVersion']}..."
+
+#Change the App ID so that the bundle ID will match the app id in the provisioning profile.
+#Uncomment next 2 lines if needed.
+# info_plist['CFBundleIdentifier']=app_id
+# $stderr.puts "   Updating Info.plist with new bundle id of #{app_id}..."
 
 $stderr.puts "   Saving updated Info.plist and Entitlements to app bundle..."
 info_plist.save_plist info_plist_path
@@ -178,7 +199,7 @@ $stderr.puts "   Removing the prior embedded.mobileprovision..."
 File.unlink("#{app_path}/embedded.mobileprovision") if File.exists? "#{app_path}/embedded.mobileprovision"
 
 $stderr.puts "   Moving provisioning profile into app..."
-File.copy(prov_profile_path,"#{app_path}/embedded.mobileprovision")
+FileUtils.cp(prov_profile_path,"#{app_path}/embedded.mobileprovision")
 
 #now we sign the whole she-bang using the info provided
 $stderr.puts "running /usr/bin/codesign -f -s \"#{dev_id}\" --resource-rules=\"#{app_path}/ResourceRules.plist\" \"#{app_path}\" --entitlements=\"#{app_path}/Entitlements.plist\""
@@ -206,10 +227,9 @@ Dir.mkdir(newFolder)
 Dir.mkdir("#{newFolder}/Payload")
 
 #Get the app name (without extension) and create a folder with the same name
-#appName=Pathname.new(app_path).basename.sub(".app","")
-File.move(app_path,"#{newFolder}/Payload")
+appName=Pathname.new(app_path).basename.sub(".app","")
+FileUtils.move(app_path,"#{newFolder}/Payload")
 
 #zip it up.  zip is a bit strange in that you have to actually be in the 
 #folder otherwise it puts the entire tree (though empty) in the zip.
-system("pushd \"#{newFolder}\" && /usr/bin/zip -r \"#{app_name}\" Payload && rm -rf Payload")
-#system("rm -rf Payload")
+system("pushd \"#{newFolder}\" && /usr/bin/zip -r \"#{appName}.ipa\" Payload")
