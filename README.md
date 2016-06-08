@@ -21,4 +21,4 @@ And use next way:
 
 Troubleshooting
 ---------
-Make sure Xcode Command Line Tools are installed on the machine you're resigning from. If not errors like "object file format unrecognized, invalid or unsuitable" will appear.
+Make sure Xcode Command Line Tools are installed. If it is not so, there will be errors like "object file format unrecognized, invalid or unsuitable".
